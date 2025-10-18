@@ -1,8 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { Button, TextField, Stack, Typography, Paper, Alert } from "@mui/material";
 
-// E-posta kontrolü: 11 haneli numara + @dogus.edu.tr
+// 12 haneli öğrenci numarası + @dogus.edu.tr
 const emailRegex = /^\d{12}@dogus\.edu\.tr$/;
 
 export default function Login() {
@@ -10,14 +11,16 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
+  const navigate = useNavigate();
 
-  const isValidEmail = (e) => emailRegex.test((e || "").trim());
+  const isValidEmail = (e) => emailRegex.test(String(e || "").trim().toLowerCase());
 
   const submit = async () => {
     setErr("");
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!isValidEmail(email)) {
-      setErr("E-posta şu formatta olmalı: 111111111111@dogus.edu.tr (12 haneli öğrenci numarası)");
+    if (!isValidEmail(normalizedEmail)) {
+      setErr("E-posta şu formatta olmalı: 202203011029@dogus.edu.tr (12 haneli öğrenci numarası)");
       return;
     }
     if (!password.trim()) {
@@ -27,11 +30,12 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const { data } = await api.post("/auth/login", { email, password });
+      const { data } = await api.post("/auth/login", { email: normalizedEmail, password });
       localStorage.setItem("user", JSON.stringify(data));
-      window.location.href = "/clubs";
+      navigate("/home"); // ✅ Giriş sonrası ana sayfaya
     } catch (e) {
-      setErr(e?.response?.data || "Giriş başarısız.");
+      const msg = e?.response?.data || "Giriş başarısız.";
+      setErr(typeof msg === "string" ? msg : "Giriş başarısız.");
     } finally {
       setLoading(false);
     }
@@ -52,7 +56,7 @@ export default function Login() {
           error={showFormatError}
           helperText={
             showFormatError
-              ? "E-posta formatı: 11 haneli öğrenci no + @dogus.edu.tr"
+              ? "E-posta formatı: 12 haneli öğrenci no + @dogus.edu.tr (örn. 202203011029@dogus.edu.tr)"
               : ""
           }
         />
@@ -64,11 +68,7 @@ export default function Login() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <Button
-          variant="contained"
-          onClick={submit}
-          disabled={loading}
-        >
+        <Button variant="contained" onClick={submit} disabled={loading}>
           {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
         </Button>
       </Stack>
