@@ -17,7 +17,7 @@ export default function Login() {
     setErr("");
 
     if (!isValidEmail(email)) {
-      setErr("E-posta şu formatta olmalı: 202203011029@dogus.edu.tr (12 haneli öğrenci numarası)");
+      setErr("E-posta şu formatta olmalı: 111111111111@dogus.edu.tr (12 haneli öğrenci numarası)");
       return;
     }
     if (!password.trim()) {
