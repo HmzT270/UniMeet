@@ -151,6 +151,7 @@ C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\UniMeetApi.AssemblyI
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\UniMeetApi.csproj.CoreCompileInputs.cache
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\UniMeetApi.MvcApplicationPartsAssemblyInfo.cs
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\UniMeetApi.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\UniMeetApi.sourcelink.json
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\rjimswa.dswa.cache.json
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\rjsmrazor.dswa.cache.json
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\obj\Debug\net9.0\rjsmcshtml.dswa.cache.json
