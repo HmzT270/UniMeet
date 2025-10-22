@@ -10,11 +10,7 @@ namespace UniMeetApi.Controllers
     public class EventsController : ControllerBase
     {
         private readonly AppDbContext _db;
-
-        public EventsController(AppDbContext db)
-        {
-            _db = db;
-        }
+        public EventsController(AppDbContext db) => _db = db;
 
         // === DTOs ===
         public record EventDto(
@@ -25,6 +21,7 @@ namespace UniMeetApi.Controllers
             DateTime? EndAt,
             int Quota,
             int ClubId,
+            string? ClubName,   // navigation olmadan subquery ile dolduruyoruz
             string? Description,
             bool IsCancelled
         );
@@ -51,18 +48,6 @@ namespace UniMeetApi.Controllers
         );
 
         // === Helpers ===
-        private static EventDto ToDto(Event e) => new(
-            e.EventId,
-            e.Title,
-            e.Location,
-            e.StartAt,
-            e.EndAt,
-            e.Quota,
-            e.ClubId,
-            e.Description,
-            e.IsCancelled
-        );
-
         private int? GetCurrentUserId()
         {
             var id = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -70,46 +55,77 @@ namespace UniMeetApi.Controllers
         }
 
         // === Everyone can view ===
-
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult<List<EventDto>>> GetAll([FromQuery] bool includeCancelled = false)
         {
+            // ClubName'ı navigation olmadan subquery ile çekiyoruz
             var query = _db.Events.AsNoTracking();
+
             if (!includeCancelled)
                 query = query.Where(e => !e.IsCancelled);
 
             var list = await query
                 .OrderBy(e => e.StartAt)
-                .Select(e => ToDto(e))
+                .Select(e => new EventDto(
+                    e.EventId,
+                    e.Title,
+                    e.Location,
+                    e.StartAt,
+                    e.EndAt,
+                    e.Quota,
+                    e.ClubId,
+                    _db.Clubs
+                        .Where(c => c.ClubId == e.ClubId)
+                        .Select(c => (string?)c.Name)
+                        .FirstOrDefault(), // yoksa null döner
+                    e.Description,
+                    e.IsCancelled
+                ))
                 .ToListAsync();
 
             return Ok(list);
         }
 
         [HttpGet("{id:int}")]
+        [AllowAnonymous]
         public async Task<ActionResult<EventDto>> GetById(int id)
         {
             var e = await _db.Events.AsNoTracking().FirstOrDefaultAsync(x => x.EventId == id);
             if (e is null) return NotFound("Etkinlik bulunamadı.");
-            return Ok(ToDto(e));
+
+            var clubName = await _db.Clubs
+                .Where(c => c.ClubId == e.ClubId)
+                .Select(c => (string?)c.Name)
+                .FirstOrDefaultAsync();
+
+            var dto = new EventDto(
+                e.EventId,
+                e.Title,
+                e.Location,
+                e.StartAt,
+                e.EndAt,
+                e.Quota,
+                e.ClubId,
+                clubName,
+                e.Description,
+                e.IsCancelled
+            );
+
+            return Ok(dto);
         }
 
         // === ManagersOnly (Manager/Admin) ===
-
-        // Sadece kulüp yöneticileri etkinlik oluşturabilsin
         [HttpPost]
-        [Authorize(Policy = "ManagersOnly")] // alternatif: [Authorize(Roles = "Manager,Admin")]
+        [Authorize(Policy = "ManagersOnly")]
         public async Task<ActionResult<EventDto>> Create([FromBody] CreateEventRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.Title))
                 return BadRequest("Etkinlik adı zorunludur.");
-
             if (string.IsNullOrWhiteSpace(req.Location))
                 return BadRequest("Etkinlik yeri zorunludur.");
-
             if (req.Quota < 1)
                 return BadRequest("Kontenjan en az 1 olmalıdır.");
-
             if (req.EndAt.HasValue && req.EndAt.Value < req.StartAt)
                 return BadRequest("Bitiş, başlangıçtan önce olamaz.");
 
@@ -134,12 +150,30 @@ namespace UniMeetApi.Controllers
             _db.Events.Add(entity);
             await _db.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetById), new { id = entity.EventId }, ToDto(entity));
+            // ClubName'ı subquery ile doldur
+            var clubName = await _db.Clubs
+                .Where(c => c.ClubId == entity.ClubId)
+                .Select(c => (string?)c.Name)
+                .FirstOrDefaultAsync();
+
+            var dto = new EventDto(
+                entity.EventId,
+                entity.Title,
+                entity.Location,
+                entity.StartAt,
+                entity.EndAt,
+                entity.Quota,
+                entity.ClubId,
+                clubName,
+                entity.Description,
+                entity.IsCancelled
+            );
+
+            return CreatedAtAction(nameof(GetById), new { id = entity.EventId }, dto);
         }
 
-        // Güncelleme (yalnızca Manager/Admin)
         [HttpPut("{id:int}")]
-        [Authorize(Policy = "ManagersOnly")] // alternatif: [Authorize(Roles = "Manager,Admin")]
+        [Authorize(Policy = "ManagersOnly")]
         public async Task<ActionResult<EventDto>> Update(int id, [FromBody] UpdateEventRequest req)
         {
             var e = await _db.Events.FirstOrDefaultAsync(x => x.EventId == id);
@@ -166,26 +200,38 @@ namespace UniMeetApi.Controllers
                 e.IsCancelled = req.IsCancelled.Value;
 
             await _db.SaveChangesAsync();
-            return Ok(ToDto(e));
+
+            var clubName = await _db.Clubs
+                .Where(c => c.ClubId == e.ClubId)
+                .Select(c => (string?)c.Name)
+                .FirstOrDefaultAsync();
+
+            var dto = new EventDto(
+                e.EventId,
+                e.Title,
+                e.Location,
+                e.StartAt,
+                e.EndAt,
+                e.Quota,
+                e.ClubId,
+                clubName,
+                e.Description,
+                e.IsCancelled
+            );
+
+            return Ok(dto);
         }
 
-        // İptal / Sil (kurala göre: yumuşak iptal)
         [HttpDelete("{id:int}")]
-        [Authorize(Policy = "ManagersOnly")] // alternatif: [Authorize(Roles = "Manager,Admin")]
+        [Authorize(Policy = "ManagersOnly")]
         public async Task<IActionResult> Cancel(int id)
         {
             var e = await _db.Events.FirstOrDefaultAsync(x => x.EventId == id);
             if (e is null) return NotFound("Etkinlik bulunamadı.");
 
-            // Yumuşak silme/iptal
             e.IsCancelled = true;
             await _db.SaveChangesAsync();
-
             return NoContent();
         }
     }
-
-    // ====== NOT: Event model alanlarını kendi yapına göre düzenle ======
-    // Eğer projenizde Event entity henüz yoksa, aşağıdaki örneği kullanabilirsiniz.
-    // AppDbContext içinde: public DbSet<Event> Events { get; set; } eklemeyi unutmayın.
 }
