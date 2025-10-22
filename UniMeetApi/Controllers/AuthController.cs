@@ -4,6 +4,11 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
+// JWT & Claims
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+
 namespace UniMeetApi.Controllers
 {
     [ApiController]
@@ -21,7 +26,9 @@ namespace UniMeetApi.Controllers
 
         // İstek/yanıt tipleri
         public record LoginReq(string Email, string Password);
-        public record LoginRes(int UserId, string Email, string FullName, string Role);
+
+        // Artık Token da döndürüyoruz
+        public record LoginRes(int UserId, string Email, string FullName, string Role, string Token);
 
         // Basit SHA256 hash (demo). Üretimde ASP.NET Identity / BCrypt önerilir.
         private static string Sha256(string input)
@@ -46,8 +53,8 @@ namespace UniMeetApi.Controllers
             // appsettings.json: "AllowedEmailDomain": "dogus.edu.tr"
             var allowed = (_cfg["AllowedEmailDomain"] ?? "dogus.edu.tr").Trim().ToLowerInvariant();
 
-            // 11 haneli öğrenci no + @dogus.edu.tr
-            var rx = new Regex(@"^(\d{12})@dogus\.edu\.tr$", RegexOptions.IgnoreCase);
+            // 12 haneli öğrenci no + @allowed
+            var rx = new Regex($@"^(\d{{12}})@{Regex.Escape(allowed)}$", RegexOptions.IgnoreCase);
             if (!rx.IsMatch(email))
                 return BadRequest($"E-posta 12 haneli öğrenci no + @{allowed} formatında olmalı. Örn: 202203011029@{allowed}");
 
@@ -62,7 +69,7 @@ namespace UniMeetApi.Controllers
                     Email = email,
                     FullName = email.Split('@')[0],     // örn: 202203011029
                     PasswordHash = Sha256(password),
-                    Role = UserRole.Member,
+                    Role = UserRole.Member,              // Varsayılan: Member
                     IsActive = true
                 };
                 _db.Users.Add(user);
@@ -75,7 +82,45 @@ namespace UniMeetApi.Controllers
                     return BadRequest("Şifre hatalı.");
             }
 
-            return new LoginRes(user.UserId, user.Email, user.FullName, user.Role.ToString());
+            // --- JWT üretimi ---
+            var issuer = _cfg["Jwt:Issuer"] ?? "";
+            var audience = _cfg["Jwt:Audience"] ?? "";
+            var key = _cfg["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(key))
+                return StatusCode(500, "JWT Key yapılandırılmamış. Lütfen appsettings.json içinde 'Jwt:Key' giriniz.");
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+            var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Name, user.FullName),
+                new Claim(ClaimTypes.Role, user.Role.ToString()) // ÖNEMLİ: rol claim
+                // Kulüp bazlı kısıt istersen ileride: new Claim("ClubId", user.ClubId?.ToString() ?? "")
+            };
+
+            var expires = DateTime.UtcNow.AddHours(8); // oturum süresi
+            var token = new JwtSecurityToken(
+                issuer: string.IsNullOrWhiteSpace(issuer) ? null : issuer,
+                audience: string.IsNullOrWhiteSpace(audience) ? null : audience,
+                claims: claims,
+                notBefore: DateTime.UtcNow,
+                expires: expires,
+                signingCredentials: credentials
+            );
+
+            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+            return new LoginRes(
+                user.UserId,
+                user.Email,
+                user.FullName,
+                user.Role.ToString(),
+                jwt
+            );
         }
     }
 }

@@ -1,6 +1,7 @@
+// src/pages/Login.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
+import { api } from "../api/index";
 import { Button, TextField, Stack, Typography, Paper, Alert } from "@mui/material";
 
 // 12 haneli öğrenci numarası + @dogus.edu.tr
@@ -30,9 +31,34 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const { data } = await api.post("/auth/login", { email: normalizedEmail, password });
-      localStorage.setItem("user", JSON.stringify(data));
-      navigate("/home"); // ✅ Giriş sonrası ana sayfaya
+
+      // ÖNEMLİ: baseURL yalnızca host+port, endpoint mutlaka /api ile başlasın
+      const { data } = await api.post("/api/Auth/login", {
+        email: normalizedEmail,
+        password,
+      });
+
+      // Backend dönen örnek: { userId, email, fullName, role, token }
+      if (!data?.token) {
+        setErr("Giriş başarılı görünüyor ama token gelmedi.");
+        return;
+      }
+
+      // Frontend’in rol/buton kontrolü için 'token' anahtarını kaydediyoruz
+      localStorage.setItem("token", data.token);
+
+      // (Opsiyonel) kullanıcı bilgisini saklamak istersen:
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          userId: data.userId,
+          email: data.email,
+          fullName: data.fullName,
+          role: data.role,
+        })
+      );
+
+      navigate("/home");
     } catch (e) {
       const msg = e?.response?.data || "Giriş başarısız.";
       setErr(typeof msg === "string" ? msg : "Giriş başarısız.");

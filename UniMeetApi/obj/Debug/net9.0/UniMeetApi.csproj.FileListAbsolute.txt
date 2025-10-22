@@ -9,6 +9,7 @@ C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\UniMeetApi.pdb
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Azure.Core.dll
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Azure.Identity.dll
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Humanizer.dll
+C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Microsoft.AspNetCore.OpenApi.dll
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Microsoft.Bcl.AsyncInterfaces.dll
 C:\Users\ByHmzT\Desktop\UniMeet\UniMeetApi\bin\Debug\net9.0\Microsoft.Build.Locator.dll
